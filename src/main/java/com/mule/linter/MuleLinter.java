@@ -2,8 +2,13 @@ package com.mule.linter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mule.linter.model.ValidationIssue;
+import com.mule.linter.rules.ApikitNamingConsistencyRule;
 import com.mule.linter.rules.ChoiceRule;
+import com.mule.linter.rules.ApiListenerPathRule;
+import com.mule.linter.rules.JavaClassNamingRule;
 import com.mule.linter.rules.LinterRule;
+import com.mule.linter.rules.ProjectNamingRule;
+import com.mule.linter.rules.VariableNamingRule;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
 
@@ -26,7 +31,12 @@ import java.util.stream.Stream;
 /** Main entry point & orchestrator: walks src/main/mule and runs every registered rule. */
 public class MuleLinter {
 
-    private static final List<LinterRule> RULES = List.of(new ChoiceRule());
+        private static final List<LinterRule> RULES = List.of(
+            new ApikitNamingConsistencyRule(),
+            new ApiListenerPathRule(),
+            new VariableNamingRule(),
+            new ChoiceRule()
+        );
 
     public static void main(String[] args) throws IOException {
         String baseDir = args.length > 0 ? args[0] : ".";
@@ -45,7 +55,9 @@ public class MuleLinter {
         }
 
         DocumentBuilder documentBuilder = createSecureDocumentBuilder();
-        List<ValidationIssue> allIssues = new ArrayList<>();
+        File projectRoot = projectDir.getParentFile().getParentFile().getParentFile();
+        List<ValidationIssue> allIssues = new ArrayList<>(new ProjectNamingRule().apply(projectRoot));
+        allIssues.addAll(new JavaClassNamingRule().apply(projectRoot));
 
         for (Path path : xmlFiles) {
             try {
@@ -81,7 +93,7 @@ public class MuleLinter {
 
     private static void writeReport(List<ValidationIssue> issues) throws IOException {
         Map<String, Object> report = new LinkedHashMap<>();
-        report.put("choices", issues);
+        report.put("issues", issues);
 
         ObjectMapper mapper = new ObjectMapper();
         String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report);

@@ -9,14 +9,14 @@ public class ValidationIssue {
     private final String severity;
     private final String message;
     private final String file;
-    private final String docId;
+    private final String identifier;
 
-    public ValidationIssue(String code, String severity, String message, String file, String docId) {
+    public ValidationIssue(String code, String severity, String message, String file, String identifier) {
         this.code = code;
         this.severity = severity;
         this.message = message;
         this.file = file;
-        this.docId = docId;
+        this.identifier = identifier;
     }
 
     public String getCode() {
@@ -35,7 +35,7 @@ public class ValidationIssue {
         return file;
     }
 
-    public String getDocId() {
-        return docId;
+    public String getIdentifier() {
+        return identifier;
     }
 }
