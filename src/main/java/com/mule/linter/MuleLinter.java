@@ -39,8 +39,8 @@ public class MuleLinter {
         );
 
     public static void main(String[] args) throws IOException {
-        String baseDir = args.length > 0 ? args[0] : ".";
-        File projectDir = new File(baseDir, "src/main/mule");
+        File projectRoot = new File(args.length > 0 ? args[0] : ".").getCanonicalFile();
+        File projectDir = new File(projectRoot, "src/main/mule");
 
         if (!projectDir.exists() || !projectDir.isDirectory()) {
             System.out.println("Error: The 'src/main/mule' directory does not exist at: " + projectDir.getAbsolutePath());
@@ -55,7 +55,6 @@ public class MuleLinter {
         }
 
         DocumentBuilder documentBuilder = createSecureDocumentBuilder();
-        File projectRoot = projectDir.getParentFile().getParentFile().getParentFile();
         List<ValidationIssue> allIssues = new ArrayList<>(new ProjectNamingRule().apply(projectRoot));
         allIssues.addAll(new JavaClassNamingRule().apply(projectRoot));
 

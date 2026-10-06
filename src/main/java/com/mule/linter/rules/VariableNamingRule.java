@@ -37,7 +37,7 @@ public class VariableNamingRule implements LinterRule {
                         "warning",
                         "Variable name '" + variableName + "' is not camelCase.",
                         context.getRelativePath(),
-                        variableName
+                        element.getAttribute("doc:id")
                 ));
             }
         }
