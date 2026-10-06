@@ -19,6 +19,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -72,7 +73,24 @@ public class MuleLinter {
             }
         }
 
-        writeReport(allIssues);
+        Path reportPath = args.length > 1 ? Path.of(args[1]) : getDefaultReportPath();
+        writeReport(allIssues, reportPath);
+    }
+
+    private static Path getDefaultReportPath() throws IOException {
+        try {
+            Path codeLocation = Path.of(MuleLinter.class.getProtectionDomain()
+                    .getCodeSource().getLocation().toURI());
+            Path outputDirectory = Files.isDirectory(codeLocation)
+                    ? codeLocation
+                    : codeLocation.getParent();
+            if ("classes".equals(outputDirectory.getFileName().toString())) {
+                outputDirectory = outputDirectory.getParent();
+            }
+            return outputDirectory.resolve("report.json");
+        } catch (URISyntaxException e) {
+            throw new IOException("Unable to determine the linter output directory", e);
+        }
     }
 
     private static DocumentBuilder createSecureDocumentBuilder() throws IOException {
@@ -90,18 +108,18 @@ public class MuleLinter {
         }
     }
 
-    private static void writeReport(List<ValidationIssue> issues) throws IOException {
+    private static void writeReport(List<ValidationIssue> issues, Path reportPath) throws IOException {
         Map<String, Object> report = new LinkedHashMap<>();
         report.put("issues", issues);
 
         ObjectMapper mapper = new ObjectMapper();
         String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report);
 
-        try (FileWriter writer = new FileWriter("report.json")) {
+        try (FileWriter writer = new FileWriter(reportPath.toFile())) {
             writer.write(json);
         }
 
-        System.out.println("Execution finished! Results written to report.json");
+        System.out.println("Execution finished! Results written to " + reportPath.toAbsolutePath());
         System.out.println(json);
     }
 }
