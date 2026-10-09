@@ -16,6 +16,8 @@ import java.util.List;
 public class ChoiceRule implements LinterRule {
 
     private static final String RULE_CODE = "choice-missing-description";
+    private static final String CORE_NAMESPACE = "http://www.mulesoft.org/schema/mule/core";
+    private static final String DOCUMENTATION_NAMESPACE = "http://www.mulesoft.org/schema/mule/documentation";
 
     @Override
     public List<ValidationIssue> apply(Document document, RuleContext context) {
@@ -24,15 +26,16 @@ public class ChoiceRule implements LinterRule {
 
         for (int i = 0; i < nodeList.getLength(); i++) {
             Node node = nodeList.item(i);
-            if (!(node instanceof Element) || !"choice".equalsIgnoreCase(node.getLocalName())) {
+            if (!(node instanceof Element) || !"choice".equalsIgnoreCase(node.getLocalName())
+                    || !CORE_NAMESPACE.equals(node.getNamespaceURI())) {
                 continue;
             }
 
             Element element = (Element) node;
-            String docDescription = element.getAttribute("doc:description");
+            String docDescription = element.getAttributeNS(DOCUMENTATION_NAMESPACE, "description");
 
             if (docDescription.trim().isEmpty()) {
-                String docId = element.getAttribute("doc:id");
+                String docId = element.getAttributeNS(DOCUMENTATION_NAMESPACE, "id");
                 issues.add(new ValidationIssue(
                         RULE_CODE,
                         "warning",

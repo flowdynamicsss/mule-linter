@@ -14,6 +14,7 @@ import java.util.List;
 public class ApikitNamingConsistencyRule implements LinterRule {
 
     private static final String RULE_CODE = "apikit-naming-mismatch";
+    private static final String APIKIT_NAMESPACE = "http://www.mulesoft.org/schema/mule/mule-apikit";
 
     @Override
     public List<ValidationIssue> apply(Document document, RuleContext context) {
@@ -23,7 +24,7 @@ public class ApikitNamingConsistencyRule implements LinterRule {
         for (int i = 0; i < nodeList.getLength(); i++) {
             Node node = nodeList.item(i);
             if (!(node instanceof Element) || !"config".equalsIgnoreCase(node.getLocalName())
-                    || !"apikit".equals(node.getPrefix())) {
+                    || !APIKIT_NAMESPACE.equals(node.getNamespaceURI())) {
                 continue;
             }
 

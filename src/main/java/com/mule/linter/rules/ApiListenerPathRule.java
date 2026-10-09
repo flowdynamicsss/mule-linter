@@ -16,7 +16,7 @@ public class ApiListenerPathRule implements LinterRule {
     private static final String RULE_CODE = "api-listener-path";
     private static final String CORE_NAMESPACE = "http://www.mulesoft.org/schema/mule/core";
     private static final String HTTP_NAMESPACE = "http://www.mulesoft.org/schema/mule/http";
-    private static final String APIKIT_NAMESPACE = "http://www.mulesoft.org/schema/mule/apikit";
+    private static final String APIKIT_NAMESPACE = "http://www.mulesoft.org/schema/mule/mule-apikit";
     private static final String REQUIRED_PATH = "/api/*";
 
     @Override

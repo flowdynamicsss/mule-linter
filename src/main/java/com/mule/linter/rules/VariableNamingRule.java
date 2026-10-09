@@ -16,6 +16,7 @@ public class VariableNamingRule implements LinterRule {
     private static final String RULE_CODE = "variable-naming-convention";
     private static final String CORE_NAMESPACE = "http://www.mulesoft.org/schema/mule/core";
     private static final String EE_CORE_NAMESPACE = "http://www.mulesoft.org/schema/mule/ee/core";
+    private static final String DOCUMENTATION_NAMESPACE = "http://www.mulesoft.org/schema/mule/documentation";
 
     @Override
     public List<ValidationIssue> apply(Document document, RuleContext context) {
@@ -37,7 +38,7 @@ public class VariableNamingRule implements LinterRule {
                         "warning",
                         "Variable name '" + variableName + "' is not camelCase.",
                         context.getRelativePath(),
-                        element.getAttribute("doc:id")
+                        element.getAttributeNS(DOCUMENTATION_NAMESPACE, "id")
                 ));
             }
         }
