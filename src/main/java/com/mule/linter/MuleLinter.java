@@ -139,6 +139,13 @@ public class MuleLinter {
 
     private static void writeReport(List<ValidationIssue> issues, Path reportPath) throws IOException {
         Map<String, Object> report = new LinkedHashMap<>();
+        Map<String, Integer> issuesByType = new LinkedHashMap<>();
+        for (ValidationIssue issue : issues) {
+            issuesByType.merge(issue.getCode(), 1, Integer::sum);
+        }
+
+        report.put("issuesFound", issues.size());
+        report.put("byType", issuesByType);
         report.put("issues", issues);
 
         ObjectMapper mapper = new ObjectMapper();
