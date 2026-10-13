@@ -38,11 +38,23 @@ public class VariableNamingRule implements LinterRule {
                         "warning",
                         "Variable name '" + variableName + "' is not camelCase.",
                         context.getRelativePath(),
-                        element.getAttributeNS(DOCUMENTATION_NAMESPACE, "id")
+                        findDocId(element)
                 ));
             }
         }
 
         return issues;
+    }
+
+    private String findDocId(Element element) {
+        Node current = element;
+        while (current instanceof Element) {
+            String docId = ((Element) current).getAttributeNS(DOCUMENTATION_NAMESPACE, "id");
+            if (!docId.isEmpty()) {
+                return docId;
+            }
+            current = current.getParentNode();
+        }
+        return "";
     }
 }
