@@ -7,10 +7,11 @@ import org.w3c.dom.Document;
 import java.util.List;
 
 /**
- * Contract implemented by every lint rule. Each rule inspects a parsed Mule XML document
- * and returns the issues it found.
+ * Base interface for rules that check a Mule XML file.
+ * To add a new rule, implement this interface and register it in {@code MuleLinter}.
  */
 public interface LinterRule {
 
+    /** Checks one parsed XML file and returns the issues found, or an empty list if everything is fine. */
     List<ValidationIssue> apply(Document document, RuleContext context);
 }

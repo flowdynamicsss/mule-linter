@@ -10,7 +10,12 @@ import org.w3c.dom.NodeList;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Flags {@code <apikit:config>} elements whose name and RAML reference don't share the same functionality+layer stem. */
+/**
+ * Checks that an {@code <apikit:config>} is named after the RAML file it points to.
+ * <p>
+ * For example, {@code name="orders-api-config"} with {@code api="resource::...:orders-api.raml"}
+ * is fine, but {@code name="orders-api-config"} pointing to {@code payments-api.raml} gets a warning.
+ */
 public class ApikitNamingConsistencyRule implements LinterRule {
 
     private static final String RULE_CODE = "apikit-naming-mismatch";
@@ -28,11 +33,13 @@ public class ApikitNamingConsistencyRule implements LinterRule {
                 continue;
             }
 
+            // Compare the names without the "-config" / ".raml" parts, so only the real name is checked
             Element element = (Element) node;
             String nameAttr = element.getAttribute("name");
             String configStem = stripSuffix(nameAttr, "-config");
             String ramlStem = extractRamlStem(element.getAttribute("api"));
 
+            // If either side is missing there is nothing to compare, so we skip it
             if (!configStem.isEmpty() && !ramlStem.isEmpty() && !configStem.equals(ramlStem)) {
                 issues.add(new ValidationIssue(
                         RULE_CODE,
@@ -47,14 +54,17 @@ public class ApikitNamingConsistencyRule implements LinterRule {
         return issues;
     }
 
+    /** Returns the RAML file name without the path prefix and ".raml" extension, or "" if there is no api value. */
     private String extractRamlStem(String apiAttribute) {
         if (apiAttribute == null || apiAttribute.isEmpty()) {
             return "";
         }
+        // The api value can look like "resource::group:artifact:version:raml:zip:file.raml", so keep only the last part
         String fileName = apiAttribute.contains(":") ? apiAttribute.substring(apiAttribute.lastIndexOf(':') + 1) : apiAttribute;
         return stripSuffix(fileName, ".raml");
     }
 
+    /** Removes the suffix from the value if it ends with it, otherwise returns the value unchanged. */
     private String stripSuffix(String value, String suffix) {
         return value.endsWith(suffix) ? value.substring(0, value.length() - suffix.length()) : value;
     }

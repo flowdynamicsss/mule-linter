@@ -31,9 +31,17 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-/** Main entry point & orchestrator: walks src/main/mule and runs every registered rule. */
+/**
+ * Entry point of the linter. Takes a Mule project folder, runs all rules on it
+ * and writes the found issues to a JSON report.
+ * <p>
+ * There are two kinds of rules: project-level ones ({@link ProjectNamingRule},
+ * {@link JavaClassNamingRule}) run once per project, and XML rules ({@link LinterRule})
+ * run on every file in {@code src/main/mule}.
+ */
 public class MuleLinter {
 
+    // To add a new XML rule, implement LinterRule and register it here
     private static final List<LinterRule> RULES = List.of(
             new ApikitNamingConsistencyRule(),
             new ApiListenerPathRule(),
@@ -69,6 +77,7 @@ public class MuleLinter {
         }
 
         DocumentBuilder documentBuilder = createSecureDocumentBuilder();
+        // Project-level checks first, they don't need the XML files
         List<ValidationIssue> allIssues = new ArrayList<>(new ProjectNamingRule().apply(projectRoot));
         allIssues.addAll(new JavaClassNamingRule().apply(projectRoot));
 
@@ -82,6 +91,7 @@ public class MuleLinter {
                     allIssues.addAll(rule.apply(document, context));
                 }
             } catch (SAXException | IOException e) {
+                // A broken file shouldn't stop the whole run, so we report it and continue with the next one
                 String line = e instanceof SAXParseException
                         ? " at line " + ((SAXParseException) e).getLineNumber()
                         : "";
@@ -106,6 +116,7 @@ public class MuleLinter {
         System.out.println("  java -jar mule-xml-linter.jar --help");
     }
 
+    /** Default report location: next to the JAR, or in the build folder when running from classes. */
     private static Path getDefaultReportPath() throws IOException {
         try {
             Path codeLocation = Path.of(MuleLinter.class.getProtectionDomain()
@@ -137,6 +148,7 @@ public class MuleLinter {
         }
     }
 
+    /** Writes the report as JSON (total count, count per rule code, and the full issue list) and prints it too. */
     private static void writeReport(List<ValidationIssue> issues, Path reportPath) throws IOException {
         Map<String, Object> report = new LinkedHashMap<>();
         Map<String, Integer> issuesByType = new LinkedHashMap<>();

@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
-/** Validates PascalCase names for Java source files. */
+/** Checks that Java files in {@code src/main/java} are named in PascalCase. Runs once per project. */
 public class JavaClassNamingRule {
 
     private static final String RULE_CODE = "java-class-naming-convention";
@@ -34,6 +34,7 @@ public class JavaClassNamingRule {
     private void addIssueIfInvalid(Path path, Path projectRoot, List<ValidationIssue> issues) {
         String fileName = path.getFileName().toString();
         String className = fileName.substring(0, fileName.length() - ".java".length());
+        // These two are special Java files and are not classes, so their names are allowed
         if ("package-info".equals(className) || "module-info".equals(className)
                 || className.matches("[A-Z][A-Za-z0-9]*")) {
             return;

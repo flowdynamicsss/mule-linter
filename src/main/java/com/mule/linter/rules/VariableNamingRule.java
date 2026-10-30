@@ -10,7 +10,7 @@ import org.w3c.dom.NodeList;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Validates camelCase names for core and Transform Message variables. */
+/** Checks that variables created with {@code set-variable} (core or Transform Message) use camelCase names. */
 public class VariableNamingRule implements LinterRule {
 
     private static final String RULE_CODE = "variable-naming-convention";
@@ -46,6 +46,7 @@ public class VariableNamingRule implements LinterRule {
         return issues;
     }
 
+    /** Looks for doc:id on the element or its closest parent, so the issue can be located in the file. */
     private String findDocId(Element element) {
         Node current = element;
         while (current instanceof Element) {

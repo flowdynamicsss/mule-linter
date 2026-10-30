@@ -11,7 +11,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Flags {@code <choice>} components that do not document their purpose via {@code doc:description}.
+ * Checks that every {@code <choice>} has a {@code doc:description}, so it is clear
+ * what the routing decides when reading the flow.
  */
 public class ChoiceRule implements LinterRule {
 

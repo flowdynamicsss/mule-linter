@@ -7,7 +7,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-/** Validates that the project root folder name is kebab-case and includes a valid API layer (sapi/papi/xapi). */
+/**
+ * Checks the project folder name. It should be kebab-case and contain an API layer,
+ * for example {@code orders-sapi}. Runs once per project, not per XML file.
+ */
 public class ProjectNamingRule {
 
     private static final String RULE_CODE = "project-naming-convention";

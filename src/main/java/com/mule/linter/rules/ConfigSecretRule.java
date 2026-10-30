@@ -14,7 +14,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
-/** Flags hardcoded credential-like values inside Mule configuration elements. */
+/**
+ * Looks for passwords, tokens, keys and similar values written directly in a config element
+ * (or inside it) instead of coming from a secure property like {@code ${secure::db.password}}.
+ */
 public class ConfigSecretRule implements LinterRule {
 
     private static final String RULE_CODE = "config-hardcoded-secret";
@@ -45,6 +48,7 @@ public class ConfigSecretRule implements LinterRule {
         return issues;
     }
 
+    /** Returns the closest config element (the element itself or a parent), or null if it is not inside one. */
     private Element findNearestConfig(Element element) {
         Node current = element;
         while (current instanceof Element) {
@@ -57,6 +61,7 @@ public class ConfigSecretRule implements LinterRule {
         return null;
     }
 
+    /** True for {@code config} and anything ending with {@code -config}, e.g. {@code http:listener-config}. */
     private boolean isConfigElement(Element element) {
         String name = element.getLocalName();
         if (name == null) {
@@ -70,6 +75,7 @@ public class ConfigSecretRule implements LinterRule {
         return "config".equals(normalized) || normalized.endsWith("-config");
     }
 
+    /** Checks the attributes and the text of one element for sensitive names with hardcoded values. */
     private void inspectElement(Element element, Element config, RuleContext context,
                                 List<ValidationIssue> issues) {
         NamedNodeMap attributes = element.getAttributes();
@@ -94,6 +100,7 @@ public class ConfigSecretRule implements LinterRule {
 
     }
 
+    /** Text written directly in the element, without the text of its children. */
     private String directText(Element element) {
         StringBuilder text = new StringBuilder();
         NodeList children = element.getChildNodes();
@@ -106,6 +113,7 @@ public class ConfigSecretRule implements LinterRule {
         return text.toString();
     }
 
+    /** Ignores case and symbols, so {@code api-key}, {@code apiKey} and {@code API_KEY} all match. */
     private boolean isSensitiveName(String name) {
         String normalized = name.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
         for (String sensitiveName : SENSITIVE_NAMES) {
@@ -116,6 +124,7 @@ public class ConfigSecretRule implements LinterRule {
         return false;
     }
 
+    /** A non-empty value counts as hardcoded unless it is a {@code secure::} property reference. */
     private boolean isHardcoded(String value) {
         String trimmed = value.trim();
         return !trimmed.isEmpty()
@@ -125,6 +134,7 @@ public class ConfigSecretRule implements LinterRule {
 
     private void addIssue(List<ValidationIssue> issues, RuleContext context, Element config,
                           Element field, String location) {
+        // Prefer the doc:id of the field itself, fall back to the config's one
         String docId = field.getAttributeNS(DOCUMENTATION_NAMESPACE, "id");
         if (docId.isEmpty()) {
             docId = config.getAttributeNS(DOCUMENTATION_NAMESPACE, "id");

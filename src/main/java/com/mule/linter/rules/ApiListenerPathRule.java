@@ -10,7 +10,10 @@ import org.w3c.dom.NodeList;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Validates that APIkit entry flows define an HTTP listener at /api/*. */
+/**
+ * Checks that every flow with an APIkit router has an HTTP listener on {@code /api/*}.
+ * Flows without a router are ignored.
+ */
 public class ApiListenerPathRule implements LinterRule {
 
     private static final String RULE_CODE = "api-listener-path";
@@ -48,6 +51,7 @@ public class ApiListenerPathRule implements LinterRule {
                 Element listener = (Element) node;
                 String path = listener.getAttribute("path");
                 if (!REQUIRED_PATH.equals(path)) {
+                    // Use the listener's display name if it has one, otherwise the flow name
                     String identifier = listener.getAttribute("doc:name");
                     issues.add(new ValidationIssue(
                             RULE_CODE,
