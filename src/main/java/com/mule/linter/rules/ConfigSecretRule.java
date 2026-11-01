@@ -1,7 +1,7 @@
 package com.mule.linter.rules;
 
-import com.mule.linter.ElementLocator;
 import com.mule.linter.RuleContext;
+import com.mule.linter.Xml;
 import com.mule.linter.model.ValidationIssue;
 import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
@@ -16,16 +16,19 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
- * Looks for passwords, tokens, keys and similar values written directly in a config element
- * (or inside it) instead of coming from a secure property like {@code ${secure::db.password}}.
+ * Looks for passwords, tokens, keys and similar things written directly in a config,
+ * instead of coming from a secure property like ${secure::db.password}.
  */
-public class ConfigSecretRule implements LinterRule {
+public class ConfigSecretRule implements XmlRule {
 
-    private static final String RULE_CODE = "config-hardcoded-secret";
-        private static final Pattern SECURE_PROPERTY = Pattern.compile("^\\$\\{\\s*secure::[^}\\s]+\\s*}$");
-        private static final Pattern DATAWEAVE_SECURE_PROPERTY = Pattern.compile(
+    // Allowed values: ${secure::some.property} and #[p('secure::some.property')]
+    private static final Pattern SECURE_PROPERTY = Pattern.compile("^\\$\\{\\s*secure::[^}\\s]+\\s*}$");
+    private static final Pattern DATAWEAVE_SECURE_PROPERTY = Pattern.compile(
             "^#\\[\\s*p\\(\\s*['\"]secure::[^'\"]+['\"]\\s*\\)\\s*]$");
-    private static final String[] SENSITIVE_NAMES = {
+    private static final Pattern NON_ALPHANUMERIC = Pattern.compile("[^a-z0-9]");
+
+    // An attribute or element with one of these words in its name holds a secret
+    private static final String[] SECRET_WORDS = {
             "password", "passwd", "passphrase", "passcode", "userpass", "secret", "token",
             "credential", "apikey", "accesskey", "privatekey", "signingkey", "encryptionkey",
             "decryptionkey", "masterkey", "sharedkey", "keypassword", "keypass", "keystorepass",
@@ -33,96 +36,60 @@ public class ConfigSecretRule implements LinterRule {
     };
 
     @Override
-    public List<ValidationIssue> apply(Document document, RuleContext context) {
-        List<ValidationIssue> issues = new ArrayList<>();
-        NodeList elements = document.getElementsByTagName("*");
+    public String code() {
+        return "config-hardcoded-secret";
+    }
 
-        for (int i = 0; i < elements.getLength(); i++) {
-            Element element = (Element) elements.item(i);
-            if (findNearestConfig(element) != null) {
-                inspectElement(element, context, issues);
+    @Override
+    public List<ValidationIssue> check(Document xml, RuleContext file) {
+        List<ValidationIssue> issues = new ArrayList<>();
+
+        for (Element element : Xml.all(xml)) {
+            if (!isInsideConfig(element)) {
+                continue;
+            }
+
+            NamedNodeMap attributes = element.getAttributes();
+            for (int i = 0; i < attributes.getLength(); i++) {
+                Attr attribute = (Attr) attributes.item(i);
+                if (isSecretName(attribute.getLocalName()) && isHardcoded(attribute.getValue())) {
+                    String where = "attribute '" + attribute.getLocalName() + "' of '" + element.getTagName() + "'";
+                    issues.add(file.warning(code(), "Hardcoded secret in " + where + ".", element));
+                }
+            }
+
+            if (isSecretName(element.getLocalName()) && isHardcoded(textOf(element))) {
+                String where = "element '" + element.getTagName() + "'";
+                issues.add(file.warning(code(), "Hardcoded secret in " + where + ".", element));
             }
         }
 
         return issues;
     }
 
-    /** Returns the closest config element (the element itself or a parent), or null if it is not inside one. */
-    private Element findNearestConfig(Element element) {
-        Node current = element;
-        while (current instanceof Element) {
-            Element candidate = (Element) current;
-            if (isConfigElement(candidate)) {
-                return candidate;
-            }
-            current = current.getParentNode();
-        }
-        return null;
-    }
-
-    /** True for {@code config} and anything ending with {@code -config}, e.g. {@code http:listener-config}. */
-    private boolean isConfigElement(Element element) {
-        String name = element.getLocalName();
-        if (name == null) {
-            name = element.getTagName();
-            int prefixEnd = name.indexOf(':');
-            if (prefixEnd >= 0) {
-                name = name.substring(prefixEnd + 1);
-            }
-        }
-        String normalized = name.toLowerCase(Locale.ROOT);
-        return "config".equals(normalized) || normalized.endsWith("-config");
-    }
-
-    /** Checks the attributes and the text of one element for sensitive names with hardcoded values. */
-    private void inspectElement(Element element, RuleContext context, List<ValidationIssue> issues) {
-        NamedNodeMap attributes = element.getAttributes();
-        for (int i = 0; i < attributes.getLength(); i++) {
-            Attr attribute = (Attr) attributes.item(i);
-            String attributeName = attribute.getLocalName() == null
-                    ? attribute.getName()
-                    : attribute.getLocalName();
-            if (isSensitiveName(attributeName) && isHardcoded(attribute.getValue())) {
-                addIssue(issues, context, element,
-                        "attribute '" + attributeName + "' on element '" + element.getTagName() + "'");
-            }
-        }
-
-        String elementName = element.getLocalName() == null ? element.getTagName() : element.getLocalName();
-        if (isSensitiveName(elementName)) {
-            String value = directText(element).trim();
-            if (isHardcoded(value)) {
-                addIssue(issues, context, element, "element '" + element.getTagName() + "'");
-            }
-        }
-
-    }
-
-    /** Text written directly in the element, without the text of its children. */
-    private String directText(Element element) {
-        StringBuilder text = new StringBuilder();
-        NodeList children = element.getChildNodes();
-        for (int i = 0; i < children.getLength(); i++) {
-            Node child = children.item(i);
-            if (child.getNodeType() == Node.TEXT_NODE || child.getNodeType() == Node.CDATA_SECTION_NODE) {
-                text.append(child.getNodeValue());
-            }
-        }
-        return text.toString();
-    }
-
-    /** Ignores case and symbols, so {@code api-key}, {@code apiKey} and {@code API_KEY} all match. */
-    private boolean isSensitiveName(String name) {
-        String normalized = name.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
-        for (String sensitiveName : SENSITIVE_NAMES) {
-            if (normalized.contains(sensitiveName)) {
+    /** True if the element is a config (name is "config" or ends with "-config") or is inside one. */
+    private boolean isInsideConfig(Element element) {
+        for (Node node = element; node instanceof Element; node = node.getParentNode()) {
+            String name = node.getLocalName().toLowerCase(Locale.ROOT);
+            if (name.equals("config") || name.endsWith("-config")) {
                 return true;
             }
         }
         return false;
     }
 
-    /** A non-empty value counts as hardcoded unless it is a {@code secure::} property reference. */
+    /** Ignores letter case and symbols, so api-key, apiKey and API_KEY all match. */
+    private boolean isSecretName(String name) {
+        String simpleName = NON_ALPHANUMERIC.matcher(name.toLowerCase(Locale.ROOT)).replaceAll("");
+        for (String word : SECRET_WORDS) {
+            if (simpleName.contains(word)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Any value counts as hardcoded, unless it is empty or a secure:: property. */
     private boolean isHardcoded(String value) {
         String trimmed = value.trim();
         return !trimmed.isEmpty()
@@ -130,14 +97,15 @@ public class ConfigSecretRule implements LinterRule {
                 && !DATAWEAVE_SECURE_PROPERTY.matcher(trimmed).matches();
     }
 
-    private void addIssue(List<ValidationIssue> issues, RuleContext context, Element field, String location) {
-        issues.add(new ValidationIssue(
-                RULE_CODE,
-                "warning",
-                "Hardcoded sensitive value found in " + location + "; use a secure property reference.",
-                context.getRelativePath(),
-                ElementLocator.identifier(field),
-                ElementLocator.line(field)
-        ));
+    /** The text written directly in the element, without the text of the elements inside it. */
+    private String textOf(Element element) {
+        StringBuilder text = new StringBuilder();
+        NodeList children = element.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+            if (children.item(i).getNodeType() == Node.TEXT_NODE) {
+                text.append(children.item(i).getNodeValue());
+            }
+        }
+        return text.toString();
     }
 }

@@ -1,17 +1,9 @@
 package com.mule.linter;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mule.linter.model.ValidationIssue;
-import com.mule.linter.rules.ApikitNamingConsistencyRule;
-import com.mule.linter.rules.ApiListenerPathRule;
-import com.mule.linter.rules.ChoiceRule;
-import com.mule.linter.rules.ConfigSecretRule;
-import com.mule.linter.rules.JavaClassNamingRule;
-import com.mule.linter.rules.LinterRule;
-import com.mule.linter.rules.ProjectNamingRule;
-import com.mule.linter.rules.SetVariableDocNameRule;
-import com.mule.linter.rules.TransformDocNameRule;
-import com.mule.linter.rules.VariableNamingRule;
+import com.mule.linter.rules.ProjectRule;
+import com.mule.linter.rules.Rules;
+import com.mule.linter.rules.XmlRule;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
@@ -19,36 +11,20 @@ import org.xml.sax.SAXParseException;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Entry point of the linter. Takes a Mule project folder, runs all rules on it
- * and writes the found issues to a JSON report.
+ * Starts the linter. Give it a Mule project folder, it runs all the checks and writes a JSON report.
  * <p>
- * There are two kinds of rules: project-level ones ({@link ProjectNamingRule},
- * {@link JavaClassNamingRule}) run once per project, and XML rules ({@link LinterRule})
- * run on every file in {@code src/main/mule}.
+ * Some checks look at the whole project (the folder name, the Java files) and run once.
+ * The others look at every XML file in src/main/mule. The list of checks is in Rules.java.
  */
 public class MuleLinter {
-
-    // To add a new XML rule, implement LinterRule and register it here
-    private static final List<LinterRule> RULES = List.of(
-            new ApikitNamingConsistencyRule(),
-            new ApiListenerPathRule(),
-            new ConfigSecretRule(),
-            new VariableNamingRule(),
-            new ChoiceRule(),
-            new SetVariableDocNameRule(),
-            new TransformDocNameRule()
-    );
 
     public static void main(String[] args) throws IOException {
         if (args.length == 0 || "-h".equals(args[0]) || "--help".equals(args[0])) {
@@ -61,37 +37,42 @@ public class MuleLinter {
             return;
         }
 
-        File projectRoot = new File(args[0]).getCanonicalFile();
-        File projectDir = new File(projectRoot, "src/main/mule");
-
-        if (!projectDir.exists() || !projectDir.isDirectory()) {
-            System.out.println("Error: The 'src/main/mule' directory does not exist at: " + projectDir.getAbsolutePath());
+        File projectFolder = new File(args[0]).getCanonicalFile();
+        File muleFolder = new File(projectFolder, "src/main/mule");
+        if (!muleFolder.isDirectory()) {
+            System.out.println("Error: The 'src/main/mule' directory does not exist at: " + muleFolder.getAbsolutePath());
             return;
         }
 
-        List<Path> xmlFiles;
-        try (Stream<Path> paths = Files.walk(projectDir.toPath())) {
-            xmlFiles = paths.filter(Files::isRegularFile)
-                    .filter(p -> p.toString().endsWith(".xml"))
-                    .collect(Collectors.toList());
+        List<ValidationIssue> issues = new ArrayList<>();
+        issues.addAll(checkProject(projectFolder));
+        issues.addAll(checkXmlFiles(muleFolder));
+
+        Path reportPath = args.length > 1 ? Path.of(args[1]) : defaultReportPath();
+        ReportWriter.write(issues, reportPath);
+    }
+
+    private static List<ValidationIssue> checkProject(File projectFolder) throws IOException {
+        List<ValidationIssue> issues = new ArrayList<>();
+        for (ProjectRule rule : Rules.PROJECT) {
+            issues.addAll(rule.check(projectFolder));
         }
+        return issues;
+    }
 
-        XmlParser xmlParser = new XmlParser();
-        // Project-level checks first, they don't need the XML files
-        List<ValidationIssue> allIssues = new ArrayList<>(new ProjectNamingRule().apply(projectRoot));
-        allIssues.addAll(new JavaClassNamingRule().apply(projectRoot));
+    private static List<ValidationIssue> checkXmlFiles(File muleFolder) throws IOException {
+        List<ValidationIssue> issues = new ArrayList<>();
+        XmlParser parser = new XmlParser();
 
-        for (Path path : xmlFiles) {
+        for (Path path : findXmlFiles(muleFolder)) {
             try {
-                Document document = xmlParser.parse(path.toFile());
-                document.getDocumentElement().normalize();
-                RuleContext context = new RuleContext(projectDir, path.toFile());
-
-                for (LinterRule rule : RULES) {
-                    allIssues.addAll(rule.apply(document, context));
+                Document xml = parser.parse(path.toFile());
+                RuleContext file = new RuleContext(muleFolder, path.toFile());
+                for (XmlRule rule : Rules.XML) {
+                    issues.addAll(rule.check(xml, file));
                 }
             } catch (SAXException | IOException e) {
-                // A broken file shouldn't stop the whole run, so we report it and continue with the next one
+                // Skip the broken file and go on with the next one
                 String line = e instanceof SAXParseException
                         ? " at line " + ((SAXParseException) e).getLineNumber()
                         : "";
@@ -99,8 +80,15 @@ public class MuleLinter {
             }
         }
 
-        Path reportPath = args.length > 1 ? Path.of(args[1]) : getDefaultReportPath();
-        writeReport(allIssues, reportPath);
+        return issues;
+    }
+
+    private static List<Path> findXmlFiles(File folder) throws IOException {
+        try (Stream<Path> paths = Files.walk(folder.toPath())) {
+            return paths.filter(Files::isRegularFile)
+                    .filter(path -> path.toString().endsWith(".xml"))
+                    .collect(Collectors.toList());
+        }
     }
 
     private static void printUsage() {
@@ -116,8 +104,8 @@ public class MuleLinter {
         System.out.println("  java -jar mule-xml-linter.jar --help");
     }
 
-    /** Default report location: next to the JAR, or in the build folder when running from classes. */
-    private static Path getDefaultReportPath() throws IOException {
+    /** By default the report is saved next to the JAR. */
+    private static Path defaultReportPath() throws IOException {
         try {
             Path codeLocation = Path.of(MuleLinter.class.getProtectionDomain()
                     .getCodeSource().getLocation().toURI());
@@ -131,30 +119,5 @@ public class MuleLinter {
         } catch (URISyntaxException e) {
             throw new IOException("Unable to determine the linter output directory", e);
         }
-    }
-
-    /** Writes the report as JSON (total count, count per rule code, and the full issue list) and prints it too. */
-    private static void writeReport(List<ValidationIssue> issues, Path reportPath) throws IOException {
-        Map<String, Object> report = new LinkedHashMap<>();
-        Map<String, Integer> issuesByType = new LinkedHashMap<>();
-        for (ValidationIssue issue : issues) {
-            issuesByType.merge(issue.getCode(), 1, Integer::sum);
-        }
-
-        report.put("issuesFound", issues.size());
-        report.put("byType", issuesByType);
-        report.put("issues", issues);
-
-        ObjectMapper mapper = new ObjectMapper();
-        String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(report);
-
-        Path parent = reportPath.toAbsolutePath().getParent();
-        if (parent != null) {
-            Files.createDirectories(parent);
-        }
-        Files.writeString(reportPath, json, StandardCharsets.UTF_8);
-
-        System.out.println("Execution finished! Results written to " + reportPath.toAbsolutePath());
-        System.out.println(json);
     }
 }

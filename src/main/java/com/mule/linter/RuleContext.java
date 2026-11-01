@@ -1,30 +1,35 @@
 package com.mule.linter;
 
+import com.mule.linter.model.ValidationIssue;
+import org.w3c.dom.Element;
+
 import java.io.File;
 
 /**
- * Shared metadata passed to every rule while it inspects a single Mule XML file.
+ * The XML file that is being checked. Rules use it to create their warnings.
  */
 public class RuleContext {
 
-    private final File projectDir;
-    private final File currentFile;
+    private final File projectFolder;
+    private final File file;
 
-    public RuleContext(File projectDir, File currentFile) {
-        this.projectDir = projectDir;
-        this.currentFile = currentFile;
+    public RuleContext(File projectFolder, File file) {
+        this.projectFolder = projectFolder;
+        this.file = file;
     }
 
-    public File getProjectDir() {
-        return projectDir;
+    /** A warning about this element. The report points at it with the doc:id (or flow name) and the line. */
+    public ValidationIssue warning(String code, String message, Element element) {
+        return warning(code, message, element, Xml.identifier(element));
     }
 
-    public File getCurrentFile() {
-        return currentFile;
+    /** Same, but with our own text to point at the element. */
+    public ValidationIssue warning(String code, String message, Element element, String identifier) {
+        return new ValidationIssue(code, "warning", message, relativePath(), identifier, Xml.line(element));
     }
 
-    /** Path of the current file relative to the project dir, using forward slashes for consistent JSON output. */
-    public String getRelativePath() {
-        return projectDir.toPath().relativize(currentFile.toPath()).toString().replace('\\', '/');
+    /** Path of the file inside the project. It always uses /, so the report looks the same everywhere. */
+    private String relativePath() {
+        return projectFolder.toPath().relativize(file.toPath()).toString().replace('\\', '/');
     }
 }

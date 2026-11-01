@@ -3,13 +3,13 @@ package com.mule.linter.model;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 /**
- * A single problem found by a rule. This is what ends up in the JSON report.
+ * One problem found by a rule. This is what goes in the JSON report.
  * <ul>
- *   <li>{@code code} - the rule that found it, e.g. {@code choice-missing-description}</li>
- *   <li>{@code severity} - for example {@code warning}</li>
- *   <li>{@code file} - path of the file, relative to the project (or the project name for project-level rules)</li>
- *   <li>{@code identifier} - helps to find the spot in the file: the doc:id, or the flow name if there is no doc:id; can be empty or null</li>
- *   <li>{@code line} - line in the file where the element starts; not set for project-level rules</li>
+ *   <li>code - which rule found it, e.g. choice-default-name</li>
+ *   <li>severity - for now always "warning"</li>
+ *   <li>file - the file, as a path inside the project (for project-wide rules it is the project name)</li>
+ *   <li>identifier - helps to find the place: the doc:id, or the flow name if there is no doc:id. Can be empty</li>
+ *   <li>line - the line in the file. Project-wide rules don't have one</li>
  * </ul>
  */
 public class ValidationIssue {
@@ -21,8 +21,9 @@ public class ValidationIssue {
     private final String identifier;
     private final Integer line;
 
-    public ValidationIssue(String code, String severity, String message, String file, String identifier) {
-        this(code, severity, message, file, identifier, null);
+    /** A warning about a file or the whole project. It has no line and no identifier. */
+    public static ValidationIssue warning(String code, String message, String file) {
+        return new ValidationIssue(code, "warning", message, file, null, null);
     }
 
     public ValidationIssue(String code, String severity, String message, String file, String identifier,

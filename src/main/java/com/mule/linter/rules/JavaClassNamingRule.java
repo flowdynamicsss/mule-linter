@@ -8,44 +8,52 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-/** Checks that Java files in {@code src/main/java} are named in PascalCase. Runs once per project. */
-public class JavaClassNamingRule {
+/** Checks that the Java files in src/main/java are named in PascalCase. Runs once per project. */
+public class JavaClassNamingRule implements ProjectRule {
 
-    private static final String RULE_CODE = "java-class-naming-convention";
+    private static final Pattern PASCAL_CASE = Pattern.compile("[A-Z][A-Za-z0-9]*");
 
-    public List<ValidationIssue> apply(File projectRoot) throws IOException {
+    @Override
+    public String code() {
+        return "java-class-naming-convention";
+    }
+
+    @Override
+    public List<ValidationIssue> check(File projectFolder) throws IOException {
         List<ValidationIssue> issues = new ArrayList<>();
-        Path javaSourceRoot = new File(projectRoot, "src/main/java").toPath();
-        if (!Files.isDirectory(javaSourceRoot)) {
+        Path projectPath = projectFolder.toPath();
+        Path javaFolder = projectPath.resolve("src/main/java");
+        if (!Files.isDirectory(javaFolder)) {
             return issues;
         }
 
-        try (Stream<Path> paths = Files.walk(javaSourceRoot)) {
-            paths.filter(Files::isRegularFile)
-                    .filter(path -> path.toString().endsWith(".java"))
-                    .forEach(path -> addIssueIfInvalid(path, projectRoot.toPath(), issues));
+        for (Path javaFile : findJavaFiles(javaFolder)) {
+            String fileName = javaFile.getFileName().toString();
+            String className = fileName.substring(0, fileName.length() - ".java".length());
+
+            // package-info and module-info are special files, not classes
+            boolean isSpecialFile = className.equals("package-info") || className.equals("module-info");
+            if (isSpecialFile || PASCAL_CASE.matcher(className).matches()) {
+                continue;
+            }
+
+            String path = projectPath.relativize(javaFile).toString().replace('\\', '/');
+            String message = "Class name '" + className + "' is not PascalCase.";
+            issues.add(new ValidationIssue(code(), "warning", message, path, className, null));
         }
 
         return issues;
     }
 
-    private void addIssueIfInvalid(Path path, Path projectRoot, List<ValidationIssue> issues) {
-        String fileName = path.getFileName().toString();
-        String className = fileName.substring(0, fileName.length() - ".java".length());
-        // These two are special Java files and are not classes, so their names are allowed
-        if ("package-info".equals(className) || "module-info".equals(className)
-                || className.matches("[A-Z][A-Za-z0-9]*")) {
-            return;
+    private List<Path> findJavaFiles(Path folder) throws IOException {
+        try (Stream<Path> paths = Files.walk(folder)) {
+            return paths.filter(Files::isRegularFile)
+                    .filter(path -> path.toString().endsWith(".java"))
+                    .collect(Collectors.toList());
         }
-
-        issues.add(new ValidationIssue(
-                RULE_CODE,
-                "warning",
-                "Java class name '" + className + "' is not PascalCase.",
-                projectRoot.relativize(path).toString().replace('\\', '/'),
-                className
-        ));
     }
 }

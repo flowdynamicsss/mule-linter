@@ -1,49 +1,39 @@
 package com.mule.linter.rules;
 
-import com.mule.linter.ElementLocator;
+import com.mule.linter.Namespaces;
 import com.mule.linter.RuleContext;
+import com.mule.linter.Xml;
 import com.mule.linter.model.ValidationIssue;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
-/** Checks that variables created with {@code set-variable} (core or Transform Message) use camelCase names. */
-public class VariableNamingRule implements LinterRule {
+/** Checks that variables made with set-variable are camelCase, e.g. orderId. */
+public class VariableNamingRule implements XmlRule {
 
-    private static final String RULE_CODE = "variable-naming-convention";
-    private static final String CORE_NAMESPACE = "http://www.mulesoft.org/schema/mule/core";
-    private static final String EE_CORE_NAMESPACE = "http://www.mulesoft.org/schema/mule/ee/core";
+    private static final Pattern CAMEL_CASE = Pattern.compile("[a-z][a-zA-Z0-9]*");
 
     @Override
-    public List<ValidationIssue> apply(Document document, RuleContext context) {
+    public String code() {
+        return "variable-naming-convention";
+    }
+
+    @Override
+    public List<ValidationIssue> check(Document xml, RuleContext file) {
+        // set-variable exists in the core namespace and inside Transform Message
+        List<Element> variables = new ArrayList<>(Xml.find(xml, Namespaces.CORE, "set-variable"));
+        variables.addAll(Xml.find(xml, Namespaces.EE_CORE, "set-variable"));
+
         List<ValidationIssue> issues = new ArrayList<>();
-        NodeList nodes = document.getElementsByTagNameNS("*", "set-variable");
-
-        for (int i = 0; i < nodes.getLength(); i++) {
-            Node node = nodes.item(i);
-            String namespace = node.getNamespaceURI();
-            if (!CORE_NAMESPACE.equals(namespace) && !EE_CORE_NAMESPACE.equals(namespace)) {
-                continue;
-            }
-
-            Element element = (Element) node;
-            String variableName = element.getAttribute("variableName");
-            if (!variableName.matches("[a-z][a-zA-Z0-9]*")) {
-                issues.add(new ValidationIssue(
-                        RULE_CODE,
-                        "warning",
-                        "Variable name '" + variableName + "' is not camelCase.",
-                        context.getRelativePath(),
-                        ElementLocator.identifier(element),
-                        ElementLocator.line(element)
-                ));
+        for (Element variable : variables) {
+            String name = variable.getAttribute("variableName");
+            if (!CAMEL_CASE.matcher(name).matches()) {
+                issues.add(file.warning(code(), "Variable '" + name + "' is not camelCase.", variable));
             }
         }
-
         return issues;
     }
 }

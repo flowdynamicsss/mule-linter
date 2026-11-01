@@ -1,68 +1,52 @@
 package com.mule.linter.rules;
 
-import com.mule.linter.ElementLocator;
+import com.mule.linter.Namespaces;
 import com.mule.linter.RuleContext;
+import com.mule.linter.Xml;
 import com.mule.linter.model.ValidationIssue;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Checks that every flow with an APIkit router has an HTTP listener on {@code /api/*}.
- * Flows without a router are ignored.
+ * Checks that a flow with an APIkit router listens on /api/*.
+ * Flows without a router are skipped.
  */
-public class ApiListenerPathRule implements LinterRule {
+public class ApiListenerPathRule implements XmlRule {
 
-    private static final String RULE_CODE = "api-listener-path";
-    private static final String CORE_NAMESPACE = "http://www.mulesoft.org/schema/mule/core";
-    private static final String HTTP_NAMESPACE = "http://www.mulesoft.org/schema/mule/http";
-    private static final String APIKIT_NAMESPACE = "http://www.mulesoft.org/schema/mule/mule-apikit";
     private static final String REQUIRED_PATH = "/api/*";
 
     @Override
-    public List<ValidationIssue> apply(Document document, RuleContext context) {
+    public String code() {
+        return "api-listener-path";
+    }
+
+    @Override
+    public List<ValidationIssue> check(Document xml, RuleContext file) {
         List<ValidationIssue> issues = new ArrayList<>();
-        NodeList flows = document.getElementsByTagNameNS(CORE_NAMESPACE, "flow");
 
-        for (int i = 0; i < flows.getLength(); i++) {
-            Element flow = (Element) flows.item(i);
-            NodeList routers = flow.getElementsByTagNameNS(APIKIT_NAMESPACE, "router");
-            if (routers.getLength() == 0) {
+        for (Element flow : Xml.find(xml, Namespaces.CORE, "flow")) {
+            if (Xml.find(flow, Namespaces.APIKIT, "router").isEmpty()) {
                 continue;
             }
 
-            NodeList listeners = flow.getElementsByTagNameNS(HTTP_NAMESPACE, "listener");
-            if (listeners.getLength() == 0) {
-                issues.add(new ValidationIssue(
-                        RULE_CODE,
-                        "warning",
-                        "APIkit flow does not define an HTTP listener with path '" + REQUIRED_PATH + "'.",
-                        context.getRelativePath(),
-                        flow.getAttribute("name"),
-                        ElementLocator.line(flow)
-                ));
-                continue;
+            String flowName = flow.getAttribute("name");
+            List<Element> listeners = Xml.find(flow, Namespaces.HTTP, "listener");
+
+            if (listeners.isEmpty()) {
+                issues.add(file.warning(code(), "No HTTP listener on '" + REQUIRED_PATH + "'.", flow, flowName));
             }
 
-            for (int listenerIndex = 0; listenerIndex < listeners.getLength(); listenerIndex++) {
-                Node node = listeners.item(listenerIndex);
-                Element listener = (Element) node;
+            for (Element listener : listeners) {
                 String path = listener.getAttribute("path");
                 if (!REQUIRED_PATH.equals(path)) {
-                    // Use the listener's display name if it has one, otherwise the flow name
-                    String identifier = listener.getAttribute("doc:name");
-                    issues.add(new ValidationIssue(
-                            RULE_CODE,
-                            "warning",
-                            "HTTP listener path '" + path + "' should be '" + REQUIRED_PATH + "'.",
-                            context.getRelativePath(),
-                            identifier.isEmpty() ? flow.getAttribute("name") : identifier,
-                            ElementLocator.line(listener)
-                    ));
+                    // Point at the listener's name if it has one, otherwise at the flow
+                    String listenerName = listener.getAttributeNS(Namespaces.DOC, "name");
+                    String pointer = listenerName.isEmpty() ? flowName : listenerName;
+                    String message = "Listener path '" + path + "' should be '" + REQUIRED_PATH + "'.";
+                    issues.add(file.warning(code(), message, listener, pointer));
                 }
             }
         }
