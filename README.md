@@ -56,8 +56,20 @@ The report is also printed in the console when the run finishes.
 | `config-hardcoded-secret` | Passwords, tokens, keys and similar values are not written directly in config, but use `${secure::...}` |
 | `variable-naming-convention` | Variables created with `set-variable` are camelCase |
 | `choice-missing-description` | Every `choice` has a `doc:description` |
+| `set-variable-default-name` | A `set-variable` doesn't keep the default name `Set Variable` (`doc:name`) |
+| `transform-default-name` | A Transform Message has a name and it is not the default `Transform Message` (`doc:name`) |
 
 All of them are reported as warnings for now.
+
+A few things that are good to know about the name rules (`set-variable-default-name`
+and `transform-default-name`):
+
+- The name is compared as a whole and the letter case is ignored, so `set variable`
+  is flagged, but `Set Variable Order` is fine.
+- A missing name is reported only for Transform Message.
+- The `ee:set-variable` elements inside a Transform Message are not checked.
+- The rules don't follow `flow-ref`. Every file is checked on its own, so a flow in
+  another file is checked when that file is processed.
 
 ## Report format
 

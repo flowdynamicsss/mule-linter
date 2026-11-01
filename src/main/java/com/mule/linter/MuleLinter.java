@@ -9,6 +9,8 @@ import com.mule.linter.rules.ConfigSecretRule;
 import com.mule.linter.rules.JavaClassNamingRule;
 import com.mule.linter.rules.LinterRule;
 import com.mule.linter.rules.ProjectNamingRule;
+import com.mule.linter.rules.SetVariableDocNameRule;
+import com.mule.linter.rules.TransformDocNameRule;
 import com.mule.linter.rules.VariableNamingRule;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
@@ -47,7 +49,9 @@ public class MuleLinter {
             new ApiListenerPathRule(),
             new ConfigSecretRule(),
             new VariableNamingRule(),
-            new ChoiceRule()
+            new ChoiceRule(),
+            new SetVariableDocNameRule(),
+            new TransformDocNameRule()
     );
 
     public static void main(String[] args) throws IOException {
