@@ -1,5 +1,6 @@
 package com.mule.linter.rules;
 
+import com.mule.linter.ElementLocator;
 import com.mule.linter.RuleContext;
 import com.mule.linter.model.ValidationIssue;
 import org.w3c.dom.Document;
@@ -36,13 +37,13 @@ public class ChoiceRule implements LinterRule {
             String docDescription = element.getAttributeNS(DOCUMENTATION_NAMESPACE, "description");
 
             if (docDescription.trim().isEmpty()) {
-                String docId = element.getAttributeNS(DOCUMENTATION_NAMESPACE, "id");
                 issues.add(new ValidationIssue(
                         RULE_CODE,
                         "warning",
                         "The <choice> component is missing a doc:description.",
                         context.getRelativePath(),
-                        docId
+                        ElementLocator.identifier(element),
+                        ElementLocator.line(element)
                 ));
             }
         }

@@ -1,5 +1,6 @@
 package com.mule.linter.rules;
 
+import com.mule.linter.ElementLocator;
 import com.mule.linter.RuleContext;
 import com.mule.linter.model.ValidationIssue;
 import org.w3c.dom.Attr;
@@ -21,7 +22,6 @@ import java.util.regex.Pattern;
 public class ConfigSecretRule implements LinterRule {
 
     private static final String RULE_CODE = "config-hardcoded-secret";
-        private static final String DOCUMENTATION_NAMESPACE = "http://www.mulesoft.org/schema/mule/documentation";
         private static final Pattern SECURE_PROPERTY = Pattern.compile("^\\$\\{\\s*secure::[^}\\s]+\\s*}$");
         private static final Pattern DATAWEAVE_SECURE_PROPERTY = Pattern.compile(
             "^#\\[\\s*p\\(\\s*['\"]secure::[^'\"]+['\"]\\s*\\)\\s*]$");
@@ -39,9 +39,8 @@ public class ConfigSecretRule implements LinterRule {
 
         for (int i = 0; i < elements.getLength(); i++) {
             Element element = (Element) elements.item(i);
-            Element config = findNearestConfig(element);
-            if (config != null) {
-                inspectElement(element, config, context, issues);
+            if (findNearestConfig(element) != null) {
+                inspectElement(element, context, issues);
             }
         }
 
@@ -76,8 +75,7 @@ public class ConfigSecretRule implements LinterRule {
     }
 
     /** Checks the attributes and the text of one element for sensitive names with hardcoded values. */
-    private void inspectElement(Element element, Element config, RuleContext context,
-                                List<ValidationIssue> issues) {
+    private void inspectElement(Element element, RuleContext context, List<ValidationIssue> issues) {
         NamedNodeMap attributes = element.getAttributes();
         for (int i = 0; i < attributes.getLength(); i++) {
             Attr attribute = (Attr) attributes.item(i);
@@ -85,7 +83,7 @@ public class ConfigSecretRule implements LinterRule {
                     ? attribute.getName()
                     : attribute.getLocalName();
             if (isSensitiveName(attributeName) && isHardcoded(attribute.getValue())) {
-                addIssue(issues, context, config, element,
+                addIssue(issues, context, element,
                         "attribute '" + attributeName + "' on element '" + element.getTagName() + "'");
             }
         }
@@ -94,7 +92,7 @@ public class ConfigSecretRule implements LinterRule {
         if (isSensitiveName(elementName)) {
             String value = directText(element).trim();
             if (isHardcoded(value)) {
-                addIssue(issues, context, config, element, "element '" + element.getTagName() + "'");
+                addIssue(issues, context, element, "element '" + element.getTagName() + "'");
             }
         }
 
@@ -132,19 +130,14 @@ public class ConfigSecretRule implements LinterRule {
                 && !DATAWEAVE_SECURE_PROPERTY.matcher(trimmed).matches();
     }
 
-    private void addIssue(List<ValidationIssue> issues, RuleContext context, Element config,
-                          Element field, String location) {
-        // Prefer the doc:id of the field itself, fall back to the config's one
-        String docId = field.getAttributeNS(DOCUMENTATION_NAMESPACE, "id");
-        if (docId.isEmpty()) {
-            docId = config.getAttributeNS(DOCUMENTATION_NAMESPACE, "id");
-        }
+    private void addIssue(List<ValidationIssue> issues, RuleContext context, Element field, String location) {
         issues.add(new ValidationIssue(
                 RULE_CODE,
                 "warning",
                 "Hardcoded sensitive value found in " + location + "; use a secure property reference.",
                 context.getRelativePath(),
-                docId
+                ElementLocator.identifier(field),
+                ElementLocator.line(field)
         ));
     }
 }

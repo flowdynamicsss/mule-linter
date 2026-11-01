@@ -16,10 +16,6 @@ import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
-import javax.xml.XMLConstants;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -80,14 +76,14 @@ public class MuleLinter {
                     .collect(Collectors.toList());
         }
 
-        DocumentBuilder documentBuilder = createSecureDocumentBuilder();
+        XmlParser xmlParser = new XmlParser();
         // Project-level checks first, they don't need the XML files
         List<ValidationIssue> allIssues = new ArrayList<>(new ProjectNamingRule().apply(projectRoot));
         allIssues.addAll(new JavaClassNamingRule().apply(projectRoot));
 
         for (Path path : xmlFiles) {
             try {
-                Document document = documentBuilder.parse(path.toFile());
+                Document document = xmlParser.parse(path.toFile());
                 document.getDocumentElement().normalize();
                 RuleContext context = new RuleContext(projectDir, path.toFile());
 
@@ -134,21 +130,6 @@ public class MuleLinter {
             return outputDirectory.resolve("report.json");
         } catch (URISyntaxException e) {
             throw new IOException("Unable to determine the linter output directory", e);
-        }
-    }
-
-    private static DocumentBuilder createSecureDocumentBuilder() throws IOException {
-        try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            factory.setNamespaceAware(true);
-            // Harden against XXE/billion-laughs since we parse files from arbitrary project checkouts.
-            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-            factory.setXIncludeAware(false);
-            factory.setExpandEntityReferences(false);
-            return factory.newDocumentBuilder();
-        } catch (ParserConfigurationException e) {
-            throw new IOException("Unable to initialize XML parser", e);
         }
     }
 

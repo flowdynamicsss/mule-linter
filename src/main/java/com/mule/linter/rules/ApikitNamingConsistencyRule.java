@@ -1,5 +1,6 @@
 package com.mule.linter.rules;
 
+import com.mule.linter.ElementLocator;
 import com.mule.linter.RuleContext;
 import com.mule.linter.model.ValidationIssue;
 import org.w3c.dom.Document;
@@ -46,7 +47,8 @@ public class ApikitNamingConsistencyRule implements LinterRule {
                         "warning",
                         "apikit:config name '" + nameAttr + "' does not match the RAML reference '" + ramlStem + "'.",
                         context.getRelativePath(),
-                        nameAttr
+                        nameAttr,
+                        ElementLocator.line(element)
                 ));
             }
         }

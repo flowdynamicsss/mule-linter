@@ -86,14 +86,20 @@ and `transform-default-name`):
       "severity": "warning",
       "message": "Variable name 'order_id' is not camelCase.",
       "file": "partner-papi-v1.xml",
-      "identifier": "3f1c2a9e-0000-0000-0000-000000000000"
+      "identifier": "3f1c2a9e-0000-0000-0000-000000000000",
+      "line": 16
     }
   ]
 }
 ```
 
-The `identifier` helps to find the place in the file. It is usually a `doc:id`
-or a flow name, and it can be empty.
+To find the place in the file, use `line` and `identifier`:
+
+- `line` is the line where the element starts. If a tag is written on several lines,
+  it is the line where the tag ends. Project-level rules don't have a line.
+- `identifier` is the `doc:id` of the element, or of its closest parent. Studio doesn't
+  add a `doc:id` to every element, so when there is none it falls back to the name of
+  the flow, and for global elements to their own name. It can still be empty.
 
 ## Adding a new rule
 

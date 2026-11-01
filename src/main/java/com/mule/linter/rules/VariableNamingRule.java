@@ -1,5 +1,6 @@
 package com.mule.linter.rules;
 
+import com.mule.linter.ElementLocator;
 import com.mule.linter.RuleContext;
 import com.mule.linter.model.ValidationIssue;
 import org.w3c.dom.Document;
@@ -16,7 +17,6 @@ public class VariableNamingRule implements LinterRule {
     private static final String RULE_CODE = "variable-naming-convention";
     private static final String CORE_NAMESPACE = "http://www.mulesoft.org/schema/mule/core";
     private static final String EE_CORE_NAMESPACE = "http://www.mulesoft.org/schema/mule/ee/core";
-    private static final String DOCUMENTATION_NAMESPACE = "http://www.mulesoft.org/schema/mule/documentation";
 
     @Override
     public List<ValidationIssue> apply(Document document, RuleContext context) {
@@ -38,24 +38,12 @@ public class VariableNamingRule implements LinterRule {
                         "warning",
                         "Variable name '" + variableName + "' is not camelCase.",
                         context.getRelativePath(),
-                        findDocId(element)
+                        ElementLocator.identifier(element),
+                        ElementLocator.line(element)
                 ));
             }
         }
 
         return issues;
-    }
-
-    /** Looks for doc:id on the element or its closest parent, so the issue can be located in the file. */
-    private String findDocId(Element element) {
-        Node current = element;
-        while (current instanceof Element) {
-            String docId = ((Element) current).getAttributeNS(DOCUMENTATION_NAMESPACE, "id");
-            if (!docId.isEmpty()) {
-                return docId;
-            }
-            current = current.getParentNode();
-        }
-        return "";
     }
 }

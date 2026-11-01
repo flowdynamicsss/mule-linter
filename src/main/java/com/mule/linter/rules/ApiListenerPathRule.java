@@ -1,5 +1,6 @@
 package com.mule.linter.rules;
 
+import com.mule.linter.ElementLocator;
 import com.mule.linter.RuleContext;
 import com.mule.linter.model.ValidationIssue;
 import org.w3c.dom.Document;
@@ -41,7 +42,8 @@ public class ApiListenerPathRule implements LinterRule {
                         "warning",
                         "APIkit flow does not define an HTTP listener with path '" + REQUIRED_PATH + "'.",
                         context.getRelativePath(),
-                        flow.getAttribute("name")
+                        flow.getAttribute("name"),
+                        ElementLocator.line(flow)
                 ));
                 continue;
             }
@@ -58,7 +60,8 @@ public class ApiListenerPathRule implements LinterRule {
                             "warning",
                             "HTTP listener path '" + path + "' should be '" + REQUIRED_PATH + "'.",
                             context.getRelativePath(),
-                            identifier.isEmpty() ? flow.getAttribute("name") : identifier
+                            identifier.isEmpty() ? flow.getAttribute("name") : identifier,
+                            ElementLocator.line(listener)
                     ));
                 }
             }

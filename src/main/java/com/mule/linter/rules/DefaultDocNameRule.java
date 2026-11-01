@@ -1,10 +1,10 @@
 package com.mule.linter.rules;
 
+import com.mule.linter.ElementLocator;
 import com.mule.linter.RuleContext;
 import com.mule.linter.model.ValidationIssue;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import java.util.ArrayList;
@@ -54,24 +54,12 @@ abstract class DefaultDocNameRule implements LinterRule {
                         "warning",
                         message,
                         context.getRelativePath(),
-                        findDocId(element)
+                        ElementLocator.identifier(element),
+                        ElementLocator.line(element)
                 ));
             }
         }
 
         return issues;
-    }
-
-    /** Looks for doc:id on the element or its closest parent, so the issue can be located in the file. */
-    private String findDocId(Element element) {
-        Node current = element;
-        while (current instanceof Element) {
-            String docId = ((Element) current).getAttributeNS(DOCUMENTATION_NAMESPACE, "id");
-            if (!docId.isEmpty()) {
-                return docId;
-            }
-            current = current.getParentNode();
-        }
-        return "";
     }
 }
